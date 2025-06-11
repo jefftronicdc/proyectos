@@ -19,36 +19,18 @@ const char* CodePass = "Bioener.2017";
 const char* Id = "plantas_deAgua.";
 //Id en hub de Leonardo:
 //const char* Id = "plantas.de.agua";
-String mensaje2;
-
 WiFiClient espClient;
 
 PubSubClient client(espClient);
 
 //-------------------------Configuro las entradas ------------------------------------------
 
-const int pinDI0 = D5; //Tanque lleno 
-const int pinDI = D6; //Produccion Planta 1
-const int pinDI2 = D7; //Produccion Planta 2
-const int pinDI3 = D1; //Produccion Planta 3
+enum SensorIndex { PLANTA1, PLANTA2, TANQUE_LLENO, PLANTA3, SENSOR_COUNT };
 
-// Variables
-bool estadoDI0 = false;
-bool estadoDIAnterior0 = false;
-
-bool estadoDI = false;
-bool estadoDIAnterior = false;
-
-bool estadoDI2 = false;
-bool estadoDIAnterior2 = false;
-
-bool estadoDI3 = false;
-bool estadoDIAnterior3 = false;
-
-unsigned long tiempoUltimoDebounce0 = 0; 
-unsigned long tiempoUltimoDebounce = 0;
-unsigned long tiempoUltimoDebounce2 = 0;
-unsigned long tiempoUltimoDebounce3 = 0;
+const uint8_t sensorPins[SENSOR_COUNT] = { D6, D7, D5, D1 };
+bool sensorState[SENSOR_COUNT] = {false};
+bool sensorPrevState[SENSOR_COUNT] = {false};
+unsigned long lastDebounceTime[SENSOR_COUNT] = {0};
 
 unsigned long tiempoDebounce = 180; 
 
@@ -82,7 +64,6 @@ void setup() {
 
   //----------------------Inicializa la conexión WiFi--------------------------------------
   WiFi.begin(mySSID, myPASSWORD);
-  Serial.begin(115200);
   while (WiFi.status() != WL_CONNECTED) {
 
     Serial.println("Conectando....");
@@ -93,58 +74,25 @@ void setup() {
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
 
-  //-----------------------Inicializa la entrada de planta 1--------------------------------------
-  pinMode(pinDI, INPUT_PULLUP);
-
-  //-----------------------Inicializa la entrada de planta 2--------------------------------------
-  pinMode(pinDI2, INPUT_PULLUP);
-
-  //-----------------------Inicializa la entrada de Tanque Lleno----------------------------------
-  pinMode(pinDI0, INPUT_PULLUP);
-
-//-------------------------Inicializa la entrada de planta 3--------------------------------------
-  pinMode(pinDI3, INPUT_PULLUP);
+  //-----------------------Inicializa las entradas-------------------------------------
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+    pinMode(sensorPins[i], INPUT_PULLUP);
+  }
 
 }
 
 //------------------------Acá se maneja los mensajes MQTT que reciba el ESP8266--------------------------------------
 void callback(char* topic, byte* payload, unsigned int length) {
+  char mensaje[80];
+  snprintf(mensaje, sizeof(mensaje),
+           "{\"data\":{\"Planta1\":%d,\"Planta2\":%d,\"TanqueLleno\":%d,\"Planta3\":%d}}",
+           sensorState[PLANTA1], sensorState[PLANTA2], sensorState[TANQUE_LLENO],
+           sensorState[PLANTA3]);
 
-  //------------Formatea estado de Planta 1 como decimal para enviar al servidor MQTT--------
-  char Planta1State[10];
-  sprintf(Planta1State, "%d", estadoDIAnterior);
-
-  //------------Formatea estado de Planta 2 como decimal para enviar al servidor MQTT--------
-  char Planta2State[10];
-  sprintf(Planta2State, "%d", estadoDIAnterior2);
-
-  //------------Formatea estado de Tanque LLeno como decimal para enviar al servidor MQTT--------
-  char TankFullState[10];
-  sprintf(TankFullState, "%d", estadoDIAnterior0);
-
-//------------Formatea estado de Planta 3 como decimal para enviar al servidor MQTT--------
-  char Planta3State[10];
-  sprintf(Planta3State, "%d", estadoDIAnterior3);
-
-  String mensaje = "{\"data\":{\"Planta1\":";
-  mensaje += Planta1State;
-  mensaje += ",\"Planta2\":";
-  mensaje += Planta2State;
-  mensaje += ",\"TanqueLleno\":";
-  mensaje += TankFullState;
-  mensaje += ",\"Planta3\":";
-  mensaje += Planta3State;
-  mensaje += "}}";
-
-//----Si el mensaje se recibe en el tema "reset", envia el estado actual de las entradas---------
-if (strcmp(topic, "plantas/reset") == 0) { 
-    client.publish("plantas/de_agua", mensaje.c_str());
-    //client.publish("plantas/de_agua", mensaje2); 
+  if (strcmp(topic, "plantas/reset") == 0) {
+    client.publish("plantas/de_agua", mensaje);
     Serial.println("---------------Res-----------");
-    //Serial.println(mensaje2);
- 
   }
-  
 }
 
 void loop() {
@@ -171,114 +119,34 @@ void loop() {
 
 }
 void debounceDI() {
+  bool cambio = false;
 
+  for (int i = 0; i < SENSOR_COUNT; i++) {
+    int lectura = !digitalRead(sensorPins[i]);
 
-
-  //------------Formatea estado de Planta 1 como decimal para enviar al servidor MQTT--------
-  char Planta1State[10];
-  sprintf(Planta1State, "%d", estadoDIAnterior);
-
-  //------------Formatea estado de Planta 2 como decimal para enviar al servidor MQTT--------
-  char Planta2State[10];
-  sprintf(Planta2State, "%d", estadoDIAnterior2);
-
-  //------------Formatea estado de Tanque LLeno como decimal para enviar al servidor MQTT--------
-  char TankFullState[10];
-  sprintf(TankFullState, "%d", estadoDIAnterior0);
-
-//------------Formatea estado de Planta 3 como decimal para enviar al servidor MQTT--------
-  char Planta3State[10];
-  sprintf(Planta3State, "%d", estadoDIAnterior3);
-
-  String mensaje = "{\"data\":{\"Planta1\":";
-  mensaje += Planta1State;
-  mensaje += ",\"Planta2\":";
-  mensaje += Planta2State;
-  mensaje += ",\"TanqueLleno\":";
-  mensaje += TankFullState;
-  mensaje += ",\"Planta3\":";
-  mensaje += Planta3State;
-  mensaje += "}}";
-
-
-//-----------------------------------------------------------------------
-  int lectura = !digitalRead(pinDI); //Planta 1
-
-  if (lectura != estadoDIAnterior) {
-    tiempoUltimoDebounce = millis();
-  }
-
-  if ((millis() - tiempoUltimoDebounce) > tiempoDebounce) {
-    if (lectura != estadoDI) {
-      estadoDI = lectura;
-      client.publish("plantas/de_agua", mensaje.c_str());
-      Serial.println(mensaje);
+    if (lectura != sensorPrevState[i]) {
+      lastDebounceTime[i] = millis();
     }
-  }
 
-  estadoDIAnterior = lectura;
-
-
-//-----------------------------------------------------------------------
-  int lectura2 = !digitalRead(pinDI2); //-------------------------Planta 2
-
-  if (lectura2 != estadoDIAnterior2) {
-    tiempoUltimoDebounce2 = millis();
-  }
-
-  if ((millis() - tiempoUltimoDebounce2) > tiempoDebounce) {
-    if (lectura2 != estadoDI2) {
-      estadoDI2 = lectura2;
-
-
-      //lastPlanta1State = planta1State;  // Iguala el estado de la entrada de planta 1
-      client.publish("plantas/de_agua", mensaje.c_str());
-      Serial.println(mensaje);
+    if ((millis() - lastDebounceTime[i]) > tiempoDebounce) {
+      if (lectura != sensorState[i]) {
+        sensorState[i] = lectura;
+        cambio = true;
+      }
     }
+
+    sensorPrevState[i] = lectura;
   }
 
-  estadoDIAnterior2 = lectura2;
-
-  //---------------------------------------------------------------------------
-  int lectura0 = !digitalRead(pinDI0); //-------------------------Tanque LLeno
-
-  if (lectura0 != estadoDIAnterior0) {
-    tiempoUltimoDebounce0 = millis();
+  if (cambio) {
+    char mensaje[80];
+    snprintf(mensaje, sizeof(mensaje),
+             "{\"data\":{\"Planta1\":%d,\"Planta2\":%d,\"TanqueLleno\":%d,\"Planta3\":%d}}",
+             sensorState[PLANTA1], sensorState[PLANTA2],
+             sensorState[TANQUE_LLENO], sensorState[PLANTA3]);
+    client.publish("plantas/de_agua", mensaje);
+    Serial.println(mensaje);
   }
-
-  if ((millis() - tiempoUltimoDebounce0) > tiempoDebounce) {
-    if (lectura0 != estadoDI0) {
-      estadoDI0 = lectura0;
-
-
-      //lastPlanta1State = planta1State;  // Iguala el estado de la entrada de planta 1
-      client.publish("plantas/de_agua", mensaje.c_str());
-      Serial.println(mensaje);
-    }
-  }
-
-  estadoDIAnterior0 = lectura0;
-  //-----------------------------------------------------------------------
-  int lectura3 = !digitalRead(pinDI3);
-
-  if (lectura3 != estadoDIAnterior3) {
-    tiempoUltimoDebounce3 = millis();
-  }
-
-  if ((millis() - tiempoUltimoDebounce3) > tiempoDebounce) {
-    if (lectura3 != estadoDI3) {
-      estadoDI3 = lectura3;
-
-
-      //lastPlanta1State = planta1State;  // Iguala el estado de la entrada de planta 1
-      client.publish("plantas/de_agua", mensaje.c_str());
-      Serial.println(mensaje);
-    }
-  }
-
-  estadoDIAnterior3 = lectura3;
-  
- 
 }
 
 
