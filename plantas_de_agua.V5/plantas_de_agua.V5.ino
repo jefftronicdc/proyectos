@@ -127,16 +127,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
   sprintf(Planta3State, "%d", estadoDIAnterior3);
 
   String mensaje = "{\"data\":{\"Planta1\":";
-  String coma = ",";
-  String Planta2 = "\"Planta2\":";
-  String coma2 = ",";
-  String TanqueLleno = "\"TanqueLleno\":";
-  String coma3 = ",";
-  String Planta3 = "\"Planta3\":";
-
-  String cierre = "}}";
-
-  mensaje.concat(Planta1State + coma + Planta2 + Planta2State + coma2 + TanqueLleno + TankFullState + coma3 + Planta3 + Planta3State + cierre);
+  mensaje += Planta1State;
+  mensaje += ",\"Planta2\":";
+  mensaje += Planta2State;
+  mensaje += ",\"TanqueLleno\":";
+  mensaje += TankFullState;
+  mensaje += ",\"Planta3\":";
+  mensaje += Planta3State;
+  mensaje += "}}";
 
 //----Si el mensaje se recibe en el tema "reset", envia el estado actual de las entradas---------
 if (strcmp(topic, "plantas/reset") == 0) { 
@@ -193,16 +191,14 @@ void debounceDI() {
   sprintf(Planta3State, "%d", estadoDIAnterior3);
 
   String mensaje = "{\"data\":{\"Planta1\":";
-  String coma = ",";
-  String Planta2 = "\"Planta2\":";
-  String coma2 = ",";
-  String TanqueLleno = "\"TanqueLleno\":";
-  String coma3 = ",";
-  String Planta3 = "\"Planta3\":";
-
-  String cierre = "}}";
-
-  mensaje.concat(Planta1State + coma + Planta2 + Planta2State + coma2 + TanqueLleno + TankFullState + coma3 + Planta3 + Planta3State + cierre);
+  mensaje += Planta1State;
+  mensaje += ",\"Planta2\":";
+  mensaje += Planta2State;
+  mensaje += ",\"TanqueLleno\":";
+  mensaje += TankFullState;
+  mensaje += ",\"Planta3\":";
+  mensaje += Planta3State;
+  mensaje += "}}";
 
 
 //-----------------------------------------------------------------------
